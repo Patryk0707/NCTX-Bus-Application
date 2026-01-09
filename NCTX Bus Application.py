@@ -1,11 +1,12 @@
 import customtkinter as ctk
 import sqlite3
 #class adminPanelView
-
-class registerEvent():
+database=sqlite3.connect("NCTX Database.db")
+cursor=database.cursor()
+"""class registerEvent():
     def __init__(self):
-        super().__init__()
-        print(self.loginUsernameBox.get())
+        super().__init__()"""
+
 
 class loginView(ctk.CTkToplevel):
     def __init__(self):
@@ -25,6 +26,7 @@ class loginView(ctk.CTkToplevel):
         self.loginPasswordBox.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="n")
         self.loginButton=ctk.CTkButton(self,text="Login")#command=loginEvent
         self.loginButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
+
 class registerView(ctk.CTkToplevel):
     def __init__(self):
         super().__init__()
@@ -41,8 +43,10 @@ class registerView(ctk.CTkToplevel):
         self.registerText3.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
         self.registerPasswordBox=ctk.CTkEntry(self,placeholder_text="Password")
         self.registerPasswordBox.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.registerButton=ctk.CTkButton(self,text="Login",command=registerEvent())
+        self.registerButton=ctk.CTkButton(self,text="Login",command=self.usernameAndPasswordGetter)
         self.registerButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
+    def usernameAndPasswordGetter(self):
+        cursor.execute("INSERT INTO Users (Username) VALUES ('self.registerUsernameBox.get()')")
 
 class homeView(ctk.CTk):
     def __init__(self):
