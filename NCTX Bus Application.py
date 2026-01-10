@@ -16,7 +16,8 @@ class userView(ctk.CTkFrame):
     def __init__(self,parent):
         super().__init__(parent)
         self.grid_columnconfigure(0, weight=1)
-        
+        self.viewAndBuyTicketsButton=ctk.CTkButton(self,text="View And Buy Tickets")
+        self.viewAndBuyTicketsButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
 
 class loginView(ctk.CTkFrame):
     def __init__(self,parent,root):
@@ -71,10 +72,14 @@ class registerView(ctk.CTkFrame):
         registeredUsername=self.registerUsernameBox.get()
         registeredPassword=self.registerPasswordBox.get()
         if registeredUsername and registeredPassword:
-            cursor.execute("INSERT INTO Users (Username,Password) VALUES (?,?)",(registeredUsername,registeredPassword))
-            database.commit()
-            dialogBox(self,"Success!","Your Username and password have been successfully registered")
-            self.root.homeViewVisible()
+            try:
+                cursor.execute("INSERT INTO Users (Username,Password) VALUES (?,?)",(registeredUsername,registeredPassword))
+                database.commit()
+                dialogBox(self,"Success!","Your Username and password have been successfully registered")
+                self.root.homeViewVisible()
+            except Exception as err:
+                self.registerText4=ctk.CTkLabel(self,text="Username Taken",fg_color="transparent",text_color="Red",anchor="center",font=("MS Sans Serif",15))
+                self.registerText4.grid(row=6, column=0, padx=20, pady=(0, 20), sticky="n")
         else:
             dialogBox(self,"Input Invalid","Username or Password field cannot be empty")
 
