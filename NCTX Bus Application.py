@@ -1,6 +1,5 @@
 import customtkinter as ctk # type: ignore
 import sqlite3,os.path
-#class adminPanelView
 
 baseDir=os.path.dirname(os.path.abspath(__file__))
 dbPath=os.path.join(baseDir,"NCTX Database.db")
@@ -12,12 +11,22 @@ class adminView(ctk.CTkFrame):
         super().__init__(parent)
         self.grid_columnconfigure(0, weight=1)
 
-class userView(ctk.CTkFrame):
+class viewAndBuyTicketsView(ctk.CTkScrollableFrame):
     def __init__(self,parent):
         super().__init__(parent)
         self.grid_columnconfigure(0, weight=1)
-        self.viewAndBuyTicketsButton=ctk.CTkButton(self,text="View And Buy Tickets")
-        self.viewAndBuyTicketsButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.welcomeUserText=ctk.CTkLabel(self,text="",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",15))
+        self.welcomeUserText.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
+
+class userView(ctk.CTkFrame):
+    def __init__(self,parent,root):
+        super().__init__(parent)
+        self.root=root
+        self.grid_columnconfigure(0, weight=1)
+        self.welcomeUserText=ctk.CTkLabel(self,text="",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",15))
+        self.welcomeUserText.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.viewAndBuyTicketsButton=ctk.CTkButton(self,text="View And Buy Tickets",command=self.root.buyAndViewTicketsVisible)
+        self.viewAndBuyTicketsButton.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="n")
 
 class loginView(ctk.CTkFrame):
     def __init__(self,parent,root):
@@ -46,6 +55,7 @@ class loginView(ctk.CTkFrame):
             if loginUsername=="admin" and loginPassword=="admin":
                 self.root.adminViewVisible()
             else:
+                self.root.user_View.welcomeUserText.configure(text=f"Welcome {loginUsername}!")
                 self.root.userViewVisible()
         else:
             self.loginText4=ctk.CTkLabel(self,text="Wrong Username or Password",fg_color="transparent",text_color="Red",anchor="center",font=("MS Sans Serif",15))
@@ -111,13 +121,15 @@ class homeView(ctk.CTk):
         self.login_View=loginView(self.frame,self)
         self.register_View=registerView(self.frame,self)
         self.home_View=ctk.CTkFrame(self.frame)
-        self.user_View=userView(self.frame)
+        self.user_View=userView(self.frame,self)
         self.admin_View=adminView(self.frame)
+        self.viewAndBuyTickets_View=viewAndBuyTicketsView(self.frame)
         self.login_View.grid(row=0, column=0, sticky="nsew")
         self.register_View.grid(row=0, column=0, sticky="nsew")
         self.home_View.grid(row=0, column=0, sticky="nsew")
         self.user_View.grid(row=0, column=0, sticky="nsew")
         self.admin_View.grid(row=0, column=0, sticky="nsew")
+        self.viewAndBuyTickets_View.grid(row=0,column=0,sticky="nsew")
         self.homeText1=ctk.CTkLabel(self.home_View,text="Welcome to the NCTX Bus Application",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",18))
         self.homeText1.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.homeText2=ctk.CTkLabel(self.home_View,text="Please either Login or Register as a user",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15))
@@ -142,6 +154,9 @@ class homeView(ctk.CTk):
 
     def adminViewVisible(self):
         self.admin_View.tkraise()
+
+    def buyAndViewTicketsVisible(self):
+        self.viewAndBuyTickets_View.tkraise()
 
 window1 = homeView()
 window1.mainloop()
