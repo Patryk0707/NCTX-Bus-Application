@@ -1,23 +1,74 @@
 import customtkinter as ctk # type: ignore
-import sqlite3,os.path
+import sqlite3,os.path,csv
 
 baseDir=os.path.dirname(os.path.abspath(__file__))
 dbPath=os.path.join(baseDir,"NCTX Database.db")
 database=sqlite3.connect(dbPath)
 cursor=database.cursor()
 
+class csvFile():
+    def __init__(self):
+        super().__init__()
+    def readCSVForDayTickets(self):
+        dayTicketsDict=[]
+        csvPath=os.path.join(baseDir,"mobile_products.csv")
+        with open(csvPath) as csvfile:
+            csvReader=csv.DictReader(csvfile)
+            for row in csvReader:
+                if row['topup_entitlement_value']=='1':
+                        price_in_pounds=int(row['topup_price_in_pence'])/100
+                        dayTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds})
+        return dayTicketsDict
+    
 class adminView(ctk.CTkFrame):
     def __init__(self,parent):
         super().__init__(parent)
         self.grid_columnconfigure(0, weight=1)
 
-class viewAndBuyTicketsView(ctk.CTkScrollableFrame):
+class viewAndBuyTicketsView(ctk.CTkFrame):
     def __init__(self,parent):
         super().__init__(parent)
+        self.csv_Reader=csvFile()
         self.grid_columnconfigure(0, weight=1)
-        self.welcomeUserText=ctk.CTkLabel(self,text="",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",15))
-        self.welcomeUserText.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.grid_rowconfigure(1,weight=1)
+        self.ticketCategorySelection=ctk.CTkComboBox(self,values=["Single Use Tickets","24 Hour Tickets","7 Day Tickets","31 Day Tickets","Annual Tickets"],command=self.changeWidgets)
+        self.ticketCategorySelection.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
+        #self.csv_Reader.readCSVForDayTickets()
+        self.widgets=ctk.CTkFrame(self)
+        self.widgets.grid(row=1,column=0,padx=20,pady=10,sticky="nsew")
 
+    def changeWidgets(self,choice):
+        data=self.csv_Reader.readCSVForDayTickets()
+        for widget in self.widgets.winfo_children():
+            widget.destroy()
+        if choice=="Single Use Tickets":
+            print("hello")
+        elif choice=="24 Hour Tickets":
+            for i,dayTickets in enumerate(data):
+                if i>=15:
+                    break
+                elif i<5:
+                    textCol=0
+                    buttonCol=1
+                    row=i*4
+                elif i<10:
+                    textCol=2
+                    buttonCol=3
+                    row=(i-5)*4
+                else:
+                    textCol=4
+                    buttonCol=5
+                    row=(i-10)*4
+                ctk.CTkLabel(self.widgets,text=dayTickets["title"]).grid(row=row,column=textCol,sticky="w",pady=(5,0))
+                ctk.CTkLabel(self.widgets,text=dayTickets["description"],wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
+                ctk.CTkLabel(self.widgets,text=f"Price: £{dayTickets['price']}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
+                ctk.CTkButton(self.widgets,width=60,text="Buy").grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
+        elif choice=="7 Day Tickets":
+            print("testing1")
+        elif choice=="31 Day Tickets":
+            print("testing2")
+        elif choice=="Annual Tickets":
+            print("testing3")
 class userView(ctk.CTkFrame):
     def __init__(self,parent,root):
         super().__init__(parent)
@@ -156,6 +207,7 @@ class homeView(ctk.CTk):
         self.admin_View.tkraise()
 
     def buyAndViewTicketsVisible(self):
+        self.geometry("1250x700")
         self.viewAndBuyTickets_View.tkraise()
 
 window1 = homeView()
