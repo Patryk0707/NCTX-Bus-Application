@@ -19,8 +19,10 @@ class manageTicketsView(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
         self.chooseTickets=ctk.CTkComboBox(self,values=["Choose Ticket Group","Valid Tickets","Used Tickets"],width=170,command=self.refreshLists)
         self.chooseTickets.grid(row=0,column=0,pady=(10,10))
+        self.backButton=ctk.CTkButton(self,text="Back",command=self.root.userViewVisible)
+        self.backButton.grid(row=0, column=1, padx=20, pady=(0, 20), sticky="n")
         self.displayTicketsFrame=ctk.CTkScrollableFrame(self, width=700, height=500)
-        self.displayTicketsFrame.grid(row=2,column=0,sticky="nsew",padx=20,pady=(0, 20))
+        self.displayTicketsFrame.grid(row=2,column=0,columnspan=2,sticky="nsew",padx=20,pady=(0, 20))
         self.displayTicketsFrame.grid_columnconfigure(0,weight=1)
 
     def usedTickets(self,purchaseID:int):
@@ -61,7 +63,7 @@ class manageTicketsView(ctk.CTkFrame):
                 duration=row[2]
                 datePurchased=row[3]
                 ctk.CTkLabel(self.displayTicketsFrame,text=title,font=("MS Sans Serif",16)).grid(row=r,column=0,sticky="w",pady=(10,0))
-                ctk.CTkLabel(self.displayTicketsFrame,text=f"Purchased: {datePurchased}  Duration: {duration}").grid(row=r+1, column=0, sticky="w")
+                ctk.CTkLabel(self.displayTicketsFrame,text=f"Purchased: {datePurchased}  Duration: {self.durationFormat(int(duration))}").grid(row=r+1, column=0, sticky="w")
                 useButton=ctk.CTkButton(self.displayTicketsFrame,text="Use",command=lambda p=purchaseID:self.usedTickets(p))
                 useButton.grid(row=r, column=1, rowspan=2, padx=10, pady=10)
                 r+=3
@@ -80,11 +82,19 @@ class manageTicketsView(ctk.CTkFrame):
                 ctk.CTkLabel(self.displayTicketsFrame,text=title,font=("MS Sans Serif", 16)).grid(row=r,column=0,sticky="w",pady=(10,0))
                 ctk.CTkLabel(self.displayTicketsFrame,text=f"Used: {usedDate} | Expires: {expiryDate}").grid(row=r+1,column=0,sticky="w")
                 r += 3
+    def durationFormat(self,duration):
+        if duration==10:
+            return "10 Minutes"
+        if duration==1:
+            return "1 day"
+        return f"{duration} days"
 class topUpMoneyView(ctk.CTkFrame):
     def __init__(self,parent,root):
         super().__init__(parent)
         self.root=root
         self.grid_columnconfigure(0, weight=1)
+        self.backButton=ctk.CTkButton(self,text="Back",command=self.root.userViewVisible)
+        self.backButton.grid(row=0, column=1, padx=20, pady=(0, 20), sticky="n")
     def getTopUpValue(self):
         cursor.execute("SELECT BalanceInPennies FROM Users WHERE Username=?",(self.root.loginUsername,))
         currentMoney=cursor.fetchone()[0]
@@ -186,6 +196,8 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
         self.grid_rowconfigure(1,weight=1)
         self.ticketCategorySelection=ctk.CTkComboBox(self,values=["Choose Category","Single Use Tickets","24 Hour Tickets","7 Day Tickets","31 Day Tickets","Annual Tickets"],command=self.changeWidgets)
         self.ticketCategorySelection.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.backButton=ctk.CTkButton(self,text="Back",command=self.root.userViewVisible)
+        self.backButton.grid(row=0, column=1, padx=20, pady=(0, 20), sticky="n")
         #self.csv_Reader.readCSVForDayTickets()
         self.widgets=ctk.CTkFrame(self)
         self.widgets.grid(row=1,column=0,padx=20,pady=10,sticky="nsew")
