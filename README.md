@@ -28,3 +28,6 @@ I created 3 buttons in the user view frame which navigates them to either the pa
 new classes(viewAndBuyTicketsView,csvFile,topUpMoneyView,manageTicketsView)
 <ins>Issues during testing and fixes:</ins>
 Had issues with scrollable frame for one of my classes so i decided to revert back to ctkframes. after using scrollable frames later inside a view, it decided to work. Not sure what the issue was for it not to work the first time but i have figured out a way to get around the issue. when retrieving moneyInPennies from the database it was as a tuple meaning i couldnt show the amount a user has. the solution was to add a [0] after fetching the moneyInPennies which has since been renamed to amountInPennies for clarity.
+
+**Use Case 3**
+Administrators will be able to control ticket pricing by changing individual pricing for different tickets

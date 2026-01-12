@@ -127,61 +127,39 @@ class topUpMoneyView(ctk.CTkFrame):
             cursor.execute("UPDATE Users SET BalanceInPennies=BalanceInPennies+? WHERE Username=?",(amountInPennies,self.root.loginUsername,))
             database.commit()
             for widget in self.winfo_children():
-                widget.destroy()
+                if widget is not self.backButton:
+                    widget.destroy()
             self.getTopUpValue()
 class csvFile():
     def __init__(self):
         super().__init__()
-    def readCSVForDayTickets(self):
-        dayTicketsDict=[]
+    def readCSVTicketInfo(self,durationValue):
+        TicketsDict=[]
         csvPath=os.path.join(baseDir,"mobile_products.csv")
-        with open(csvPath) as csvfile:
-            csvReader=csv.DictReader(csvfile)
-            for row in csvReader:
-                if row['topup_entitlement_value']=='1':
-                        price_in_pounds=int(row['topup_price_in_pence'])/100
-                        dayTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
-        return dayTicketsDict
+        try:
+            with open(csvPath) as csvfile:
+                csvReader=csv.DictReader(csvfile)
+                for row in csvReader:
+                    if row["topup_entitlement_value"]==durationValue:
+                            price_in_pounds=int(row['topup_price_in_pence'])/100
+                            TicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"]),"people": int(row["topup_passenger_class_quantity"])})
+        except FileNotFoundError:
+            dialogBox(self.root,"CSV Error","mobile_products.csv file not found, please ensure it is stored in the same folder as the python file")
+            return []
+        except Exception:
+            dialogBox(self.root,"CSV Error","The CSV file could not be read")
+            return []
+        return TicketsDict
     def readCSVForSingleTickets(self):
-        singleTicketsDict=[]
-        csvPath=os.path.join(baseDir,"mobile_products.csv")
-        with open(csvPath) as csvfile:
-            csvReader=csv.DictReader(csvfile)
-            for row in csvReader:
-                if row['topup_entitlement_value']=='10':
-                        price_in_pounds=int(row['topup_price_in_pence'])/100
-                        singleTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
-        return singleTicketsDict
+        return self.readCSVTicketInfo("10")
+    def readCSVForDayTickets(self):
+        return self.readCSVTicketInfo("1")
     def readCSVForWeekTickets(self):
-        weekTicketsDict=[]
-        csvPath=os.path.join(baseDir,"mobile_products.csv")
-        with open(csvPath) as csvfile:
-            csvReader=csv.DictReader(csvfile)
-            for row in csvReader:
-                if row['topup_entitlement_value']=='7':
-                        price_in_pounds=int(row['topup_price_in_pence'])/100
-                        weekTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
-        return weekTicketsDict
+        return self.readCSVTicketInfo("7")
     def readCSVForMonthTickets(self):
-        monthTicketsDict=[]
-        csvPath=os.path.join(baseDir,"mobile_products.csv")
-        with open(csvPath) as csvfile:
-            csvReader=csv.DictReader(csvfile)
-            for row in csvReader:
-                if row['topup_entitlement_value']=='31':
-                        price_in_pounds=int(row['topup_price_in_pence'])/100
-                        monthTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
-        return monthTicketsDict
+        return self.readCSVTicketInfo("31")
     def readCSVForYearTickets(self):
-        yearTicketsDict=[]
-        csvPath=os.path.join(baseDir,"mobile_products.csv")
-        with open(csvPath) as csvfile:
-            csvReader=csv.DictReader(csvfile)
-            for row in csvReader:
-                if row['topup_entitlement_value']=='365':
-                        price_in_pounds=int(row['topup_price_in_pence'])/100
-                        yearTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
-        return yearTicketsDict
+        return self.readCSVTicketInfo("365")
 class adminView(ctk.CTkFrame):
     def __init__(self,parent):
         super().__init__(parent)
@@ -192,7 +170,7 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
         super().__init__(parent)
         self.root=root
         self.data=self.csv_Reader=csvFile()
-        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure((0,1), weight=1)
         self.grid_rowconfigure(1,weight=1)
         self.ticketCategorySelection=ctk.CTkComboBox(self,values=["Choose Category","Single Use Tickets","24 Hour Tickets","7 Day Tickets","31 Day Tickets","Annual Tickets"],command=self.changeWidgets)
         self.ticketCategorySelection.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
@@ -200,101 +178,26 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
         self.backButton.grid(row=0, column=1, padx=20, pady=(0, 20), sticky="n")
         #self.csv_Reader.readCSVForDayTickets()
         self.widgets=ctk.CTkFrame(self)
-        self.widgets.grid(row=1,column=0,padx=20,pady=10,sticky="nsew")
+        self.widgets.grid(row=1,column=0,columnspan=2,padx=20,pady=10,sticky="nsew")
 
     def changeWidgets(self,choice):
         self.page=0
         self.pageNumber=15
-        self.currentChoice=None
-        for widget in self.widgets.winfo_children():
-            widget.destroy()
         if choice=="Single Use Tickets":
-            self.data=self.csv_Reader.readCSVForSingleTickets()
-            for i,singleTickets in enumerate(self.data):
-                if i>=15:
-                    break
-                elif i<5:
-                    textCol=0
-                    buttonCol=1
-                    row=i*4
-                elif i<10:
-                    textCol=2
-                    buttonCol=3
-                    row=(i-5)*4
-                else:
-                    textCol=4
-                    buttonCol=5
-                    row=(i-10)*4
-                ctk.CTkLabel(self.widgets,text=singleTickets["title"]).grid(row=row,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=singleTickets["description"],wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=f"Price: £{singleTickets['price']}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda ticket=singleTickets:self.buyTickets(ticket)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
+            self.data = self.csv_Reader.readCSVForSingleTickets()
+            self.viewTickets(self.data)
         elif choice=="24 Hour Tickets":
             self.data=self.csv_Reader.readCSVForDayTickets()
-            self.view24HourTickets()
+            self.viewTickets(self.data,showPaging=True)
         elif choice=="7 Day Tickets":
             self.data=self.csv_Reader.readCSVForWeekTickets()
-            for i,weekTickets in enumerate(self.data):
-                if i>=15:
-                    break
-                elif i<5:
-                    textCol=0
-                    buttonCol=1
-                    row=i*4
-                elif i<10:
-                    textCol=2
-                    buttonCol=3
-                    row=(i-5)*4
-                else:
-                    textCol=4
-                    buttonCol=5
-                    row=(i-10)*4
-                ctk.CTkLabel(self.widgets,text=weekTickets["title"]).grid(row=row,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=weekTickets["description"],wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=f"Price: £{weekTickets['price']}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda ticket=weekTickets:self.buyTickets(ticket)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
+            self.viewTickets(self.data)
         elif choice=="31 Day Tickets":
             self.data=self.csv_Reader.readCSVForMonthTickets()
-            for i,monthTickets in enumerate(self.data):
-                if i>=15:
-                    break
-                elif i<5:
-                    textCol=0
-                    buttonCol=1
-                    row=i*4
-                elif i<10:
-                    textCol=2
-                    buttonCol=3
-                    row=(i-5)*4
-                else:
-                    textCol=4
-                    buttonCol=5
-                    row=(i-10)*4
-                ctk.CTkLabel(self.widgets,text=monthTickets["title"]).grid(row=row,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=monthTickets["description"],wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=f"Price: £{monthTickets['price']}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda ticket=monthTickets:self.buyTickets(ticket)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
+            self.viewTickets(self.data)
         elif choice=="Annual Tickets":
             self.data=self.csv_Reader.readCSVForYearTickets()
-            for i,yearTickets in enumerate(self.data):
-                if i>=15:
-                    break
-                elif i<5:
-                    textCol=0
-                    buttonCol=1
-                    row=i*4
-                elif i<10:
-                    textCol=2
-                    buttonCol=3
-                    row=(i-5)*4
-                else:
-                    textCol=4
-                    buttonCol=5
-                    row=(i-10)*4
-                ctk.CTkLabel(self.widgets,text=yearTickets["title"]).grid(row=row,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=yearTickets["description"],wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=f"Price: £{yearTickets['price']}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda ticket=yearTickets:self.buyTickets(ticket)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
+            self.viewTickets(self.data)
 
     def buyTickets(self,ticket):
         ticketPriceInPennies=int(ticket["price"]*100)
@@ -316,13 +219,16 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
         cursor.execute("INSERT INTO Purchases(Username,TicketTitle,Duration,PricePaidInPennies,DatePurchased,UsedDate,ExpiryDate)VALUES(?,?,?,?,?,NULL,NULL)",(username,title,duration,pricePaidInPennies,purchasedDate))
         database.commit()
 
-    def view24HourTickets(self):
+    def viewTickets(self,tickets,showPaging=False):
         for widget in self.widgets.winfo_children():
             widget.destroy()
-        start=self.page*self.pageNumber
-        end=start+self.pageNumber
-        pageItems=self.data[start:end]
-        for i,dayTickets in enumerate(pageItems):
+        if showPaging:
+            start=self.page*self.pageNumber
+            end=start+self.pageNumber
+            pageItems=tickets[start:end]
+        else:
+            pageItems = tickets[:15]
+        for i,t in enumerate(pageItems):
                 if i<5:
                     textCol=0
                     buttonCol=1
@@ -335,34 +241,39 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
                     textCol=4
                     buttonCol=5
                     row=(i-10)*4
-                ctk.CTkLabel(self.widgets,text=dayTickets["title"]).grid(row=row,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=dayTickets["description"],wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkLabel(self.widgets,text=f"Price: £{dayTickets['price']}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
-                ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda t=dayTickets:self.buyTickets(t)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
-        totalPages=(len(self.data)-1)//self.pageNumber+1
-        viewFor24HourTickets=ctk.CTkFrame(self.widgets,fg_color="transparent") 
-        footerRow = len(pageItems) * 4 
-        viewFor24HourTickets.grid(row=footerRow,column=0,columnspan=6,pady=(10,0),sticky="ew")
-        viewFor24HourTickets.grid_columnconfigure((0,1,2),weight=1)
-        previousPageButton=ctk.CTkButton(viewFor24HourTickets,text="Previous Page",command=self.previousPage)
-        nextPageButton=ctk.CTkButton(viewFor24HourTickets,text="Next Page",command=self.nextPage)
-        currentPageNumber=ctk.CTkLabel(viewFor24HourTickets,text=f"Page{self.page+1}/{totalPages}")
-        previousPageButton.grid(row=0,column=0,sticky="w")
-        currentPageNumber.grid(row=0,column=1)
-        nextPageButton.grid(row=0,column=2,sticky="e")
+                title=t.get("title","unknown")
+                people=t.get("people",1)
+                desc=t.get("description","")
+                price=t.get("price",0)
+                ctk.CTkLabel(self.widgets,text=f"{title}-Valid for:{people} people").grid(row=row,column=textCol,sticky="w",pady=(5,0))
+                ctk.CTkLabel(self.widgets,text=desc,wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
+                ctk.CTkLabel(self.widgets,text=f"Price: £{price}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
+                ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda ticket=t:self.buyTickets(ticket)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
+        if showPaging:
+            totalPages=(len(self.data)-1)//self.pageNumber+1
+            footerRow=5*4 
+            footer=ctk.CTkFrame(self.widgets,fg_color="transparent") 
+            footer.grid(row=footerRow,column=0,columnspan=6,pady=(10,0),sticky="ew")
+            footer.grid_columnconfigure((0,1,2),weight=1)
+            previousPageButton=ctk.CTkButton(footer,text="Previous Page",command=self.previousPage)
+            nextPageButton=ctk.CTkButton(footer,text="Next Page",command=self.nextPage)
+            currentPageNumber=ctk.CTkLabel(footer,text=f"Page{self.page+1}/{totalPages}")
+            previousPageButton.grid(row=0,column=0,sticky="w")
+            currentPageNumber.grid(row=0,column=1)
+            nextPageButton.grid(row=0,column=2,sticky="e")
 
-        if self.page==0:
-            previousPageButton.configure(state="disabled")
-        if self.page>=totalPages-1:
-            nextPageButton.configure(state="disabled")
+            if self.page==0:
+                previousPageButton.configure(state="disabled")
+            if self.page>=totalPages-1:
+                nextPageButton.configure(state="disabled")
 
     def nextPage(self):
         self.page+=1
-        self.view24HourTickets()
+        self.viewTickets(self.data, showPaging=True)
     def previousPage(self):
         if self.page>0:
             self.page-=1
-        self.view24HourTickets()
+            self.viewTickets(self.data, showPaging=True)
 
 class userView(ctk.CTkFrame):
     def __init__(self,parent,root):
