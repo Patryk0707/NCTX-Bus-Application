@@ -1,11 +1,85 @@
 import customtkinter as ctk # type: ignore
 import sqlite3,os.path,csv
+from datetime import datetime,timedelta
+
 
 baseDir=os.path.dirname(os.path.abspath(__file__))
 dbPath=os.path.join(baseDir,"NCTX Database.db")
 database=sqlite3.connect(dbPath)
 cursor=database.cursor()
 
+
+
+
+class manageTicketsView(ctk.CTkFrame):
+    def __init__(self,parent,root):
+        super().__init__(parent)
+        self.root=root
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+        self.chooseTickets=ctk.CTkComboBox(self,values=["Choose Ticket Group","Valid Tickets","Used Tickets"],width=170,command=self.refreshLists)
+        self.chooseTickets.grid(row=0,column=0,pady=(10,10))
+        self.displayTicketsFrame=ctk.CTkScrollableFrame(self, width=700, height=500)
+        self.displayTicketsFrame.grid(row=2,column=0,sticky="nsew",padx=20,pady=(0, 20))
+        self.displayTicketsFrame.grid_columnconfigure(0,weight=1)
+
+    def usedTickets(self,purchaseID:int):
+        usedTicketDate=datetime.now()
+        usedTicketDateString=usedTicketDate.strftime("%d/%m/%y %H:%M")
+        cursor.execute("SELECT Duration From Purchases WHERE PurchaseID=? AND Username=? AND UsedDate Is NULL",(purchaseID,self.root.loginUsername))
+        row=cursor.fetchone()
+        if not row:
+            dialogBox(self,"Error","Ticket Already Used")
+            return
+        duration=int(row[0])
+        if duration==10:
+            ticketExpiryDate=usedTicketDate+timedelta(minutes=duration)
+        else:
+            ticketExpiryDate=usedTicketDate+timedelta(days=duration)
+        ticketExpiryDateString=ticketExpiryDate.strftime("%d/%m/%y %H:%M")
+        cursor.execute("UPDATE Purchases SET UsedDate=?,ExpiryDate=? WHERE PurchaseID=? AND Username=? AND UsedDate IS NULL",(usedTicketDateString,ticketExpiryDateString,purchaseID,self.root.loginUsername))
+        database.commit()
+        dialogBox(self,"Success","Ticket activated!")
+        self.refreshLists()
+
+    def refreshLists(self,choice=None):
+        if choice is None:
+            choice=self.chooseTickets.get()
+        for w in self.displayTicketsFrame.winfo_children():
+            w.destroy()
+        username=self.root.loginUsername
+        if choice=="Valid Tickets":
+            cursor.execute("SELECT PurchaseID,TicketTitle,Duration,DatePurchased FROM Purchases WHERE Username=? AND UsedDate Is NULL ORDER BY PurchaseID DESC",(username,))
+            rows=cursor.fetchall()
+            if not rows:
+                ctk.CTkLabel(self.displayTicketsFrame,text="No valid tickets").grid(row=0, column=0, pady=10)
+                return
+            r=0
+            for row in rows:
+                purchaseID=row[0]
+                title=row[1]
+                duration=row[2]
+                datePurchased=row[3]
+                ctk.CTkLabel(self.displayTicketsFrame,text=title,font=("MS Sans Serif",16)).grid(row=r,column=0,sticky="w",pady=(10,0))
+                ctk.CTkLabel(self.displayTicketsFrame,text=f"Purchased: {datePurchased}  Duration: {duration}").grid(row=r+1, column=0, sticky="w")
+                useButton=ctk.CTkButton(self.displayTicketsFrame,text="Use",command=lambda p=purchaseID:self.usedTickets(p))
+                useButton.grid(row=r, column=1, rowspan=2, padx=10, pady=10)
+                r+=3
+        else:
+            cursor.execute("SELECT PurchaseID,TicketTitle,UsedDate,ExpiryDate FROM Purchases WHERE Username=? AND UsedDate IS NOT NULL ORDER BY PurchaseID DESC",(username,))
+            rows=cursor.fetchall()
+            if not rows:
+                ctk.CTkLabel(self.displayTicketsFrame,text="No used tickets").grid(row=0,column=0,pady=10)
+                return
+            r=0
+            for row in rows:
+                purchaseID = row[0]
+                title = row[1]
+                usedDate = row[2]
+                expiryDate = row[3]
+                ctk.CTkLabel(self.displayTicketsFrame,text=title,font=("MS Sans Serif", 16)).grid(row=r,column=0,sticky="w",pady=(10,0))
+                ctk.CTkLabel(self.displayTicketsFrame,text=f"Used: {usedDate} | Expires: {expiryDate}").grid(row=r+1,column=0,sticky="w")
+                r += 3
 class topUpMoneyView(ctk.CTkFrame):
     def __init__(self,parent,root):
         super().__init__(parent)
@@ -56,7 +130,7 @@ class csvFile():
             for row in csvReader:
                 if row['topup_entitlement_value']=='1':
                         price_in_pounds=int(row['topup_price_in_pence'])/100
-                        dayTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds})
+                        dayTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
         return dayTicketsDict
     def readCSVForSingleTickets(self):
         singleTicketsDict=[]
@@ -66,7 +140,7 @@ class csvFile():
             for row in csvReader:
                 if row['topup_entitlement_value']=='10':
                         price_in_pounds=int(row['topup_price_in_pence'])/100
-                        singleTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds})
+                        singleTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
         return singleTicketsDict
     def readCSVForWeekTickets(self):
         weekTicketsDict=[]
@@ -76,7 +150,7 @@ class csvFile():
             for row in csvReader:
                 if row['topup_entitlement_value']=='7':
                         price_in_pounds=int(row['topup_price_in_pence'])/100
-                        weekTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds})
+                        weekTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
         return weekTicketsDict
     def readCSVForMonthTickets(self):
         monthTicketsDict=[]
@@ -86,7 +160,7 @@ class csvFile():
             for row in csvReader:
                 if row['topup_entitlement_value']=='31':
                         price_in_pounds=int(row['topup_price_in_pence'])/100
-                        monthTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds})
+                        monthTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
         return monthTicketsDict
     def readCSVForYearTickets(self):
         yearTicketsDict=[]
@@ -96,7 +170,7 @@ class csvFile():
             for row in csvReader:
                 if row['topup_entitlement_value']=='365':
                         price_in_pounds=int(row['topup_price_in_pence'])/100
-                        yearTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds})
+                        yearTicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"])})
         return yearTicketsDict
 class adminView(ctk.CTkFrame):
     def __init__(self,parent):
@@ -211,15 +285,24 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
                 ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda ticket=yearTickets:self.buyTickets(ticket)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
 
     def buyTickets(self,ticket):
-        ticketPrice=int(ticket["price"]*100)
+        ticketPriceInPennies=int(ticket["price"]*100)
         cursor.execute("SELECT BalanceInPennies FROM Users WHERE Username=?",(self.root.loginUsername,))
         balance=cursor.fetchone()[0]
-        if balance<ticketPrice:
+        if balance<ticketPriceInPennies:
             dialogBox(self,"Not enough money","You do not have enough money for this ticket.")
             return
-        cursor.execute("UPDATE Users SET BalanceInPennies=BalanceInPennies-? WHERE Username=?",(ticketPrice,self.root.loginUsername))
+        cursor.execute("UPDATE Users SET BalanceInPennies=BalanceInPennies-? WHERE Username=?",(ticketPriceInPennies,self.root.loginUsername))
         database.commit()
+        self.logPurchase(ticket,ticketPriceInPennies)
         dialogBox(self, "Success", f"You have sucessfully bought {ticket['title']}")
+
+    def logPurchase(self,ticket,pricePaidInPennies:int):
+        username=self.root.loginUsername
+        title=ticket["title"]
+        purchasedDate=datetime.now().strftime("%d/%m/%y %H:%M")
+        duration=int(ticket.get("duration",0)) 
+        cursor.execute("INSERT INTO Purchases(Username,TicketTitle,Duration,PricePaidInPennies,DatePurchased,UsedDate,ExpiryDate)VALUES(?,?,?,?,?,NULL,NULL)",(username,title,duration,pricePaidInPennies,purchasedDate))
+        database.commit()
 
     def view24HourTickets(self):
         for widget in self.widgets.winfo_children():
@@ -245,8 +328,9 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
                 ctk.CTkLabel(self.widgets,text=f"Price: £{dayTickets['price']}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
                 ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda t=dayTickets:self.buyTickets(t)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
         totalPages=(len(self.data)-1)//self.pageNumber+1
-        viewFor24HourTickets=ctk.CTkFrame(self.widgets,fg_color="transparent")  
-        viewFor24HourTickets.grid(row=1000,column=0,columnspan=6,pady=(10,0),sticky="ew")
+        viewFor24HourTickets=ctk.CTkFrame(self.widgets,fg_color="transparent") 
+        footerRow = len(pageItems) * 4 
+        viewFor24HourTickets.grid(row=footerRow,column=0,columnspan=6,pady=(10,0),sticky="ew")
         viewFor24HourTickets.grid_columnconfigure((0,1,2),weight=1)
         previousPageButton=ctk.CTkButton(viewFor24HourTickets,text="Previous Page",command=self.previousPage)
         nextPageButton=ctk.CTkButton(viewFor24HourTickets,text="Next Page",command=self.nextPage)
@@ -267,6 +351,7 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
         if self.page>0:
             self.page-=1
         self.view24HourTickets()
+
 class userView(ctk.CTkFrame):
     def __init__(self,parent,root):
         super().__init__(parent)
@@ -276,7 +361,7 @@ class userView(ctk.CTkFrame):
         self.welcomeUserText.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.viewAndBuyTicketsButton=ctk.CTkButton(self,text="View And Buy Tickets",command=self.root.buyAndViewTicketsVisible)
         self.viewAndBuyTicketsButton.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.manageTicketsButton=ctk.CTkButton(self,text="Manage Your Tickets")
+        self.manageTicketsButton=ctk.CTkButton(self,text="Manage Your Tickets",command=self.root.manageTicketVisible)
         self.manageTicketsButton.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="n")
         self.topupButton=ctk.CTkButton(self,text="Top Up Money",command=self.root.topUpMoneyVisible)
         self.topupButton.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
@@ -379,6 +464,7 @@ class homeView(ctk.CTk):
         self.admin_View=adminView(self.frame)
         self.viewAndBuyTickets_View=viewAndBuyTicketsView(self.frame,self)
         self.topUpMoney_View=topUpMoneyView(self.frame,self)
+        self.manageTickets_View=manageTicketsView(self.frame,self)
         self.login_View.grid(row=0, column=0, sticky="nsew")
         self.register_View.grid(row=0, column=0, sticky="nsew")
         self.home_View.grid(row=0, column=0, sticky="nsew")
@@ -386,6 +472,7 @@ class homeView(ctk.CTk):
         self.admin_View.grid(row=0, column=0, sticky="nsew")
         self.viewAndBuyTickets_View.grid(row=0,column=0,sticky="nsew")
         self.topUpMoney_View.grid(row=0,column=0,sticky="nsew")
+        self.manageTickets_View.grid(row=0,column=0,sticky="nsew")
         self.homeText1=ctk.CTkLabel(self.home_View,text="Welcome to the NCTX Bus Application",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",18))
         self.homeText1.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.homeText2=ctk.CTkLabel(self.home_View,text="Please either Login or Register as a user",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15))
@@ -417,6 +504,10 @@ class homeView(ctk.CTk):
     def topUpMoneyVisible(self):
         self.topUpMoney_View.getTopUpValue()
         self.topUpMoney_View.tkraise()
+    
+    def manageTicketVisible(self):
+        self.geometry("600x325")
+        self.manageTickets_View.tkraise()
 
 window1 = homeView()
 window1.mainloop()
