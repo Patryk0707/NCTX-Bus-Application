@@ -1,6 +1,15 @@
 # NCTX Bus Application
 The NCTX Bus Application allows users to view, manage and buy bus tickets as well as top up account credit through an accessible user interface. Administrators can manage ticket pricing and check ticket sales within the month
 
+**How to use the NCTX Bus Application**
+You can either register as a user or login as a user if you already have registered. Once you login your greeted with 3 buttons, view or buy tickets button, manage tickets or top up button. view and buy button takes you to the page where you can buy tickets. they are sorted in different categories such single,day,week,month or annual tickets. these can be chosen using the combo box. Then you can proceed to view information about a ticket such as the name of the ticket,description,price and how many passengers its for.
+
+To buy tickets you need enough money to afford the ticket(can be topped up at the top up page), once you buy the ticket it can be used in the manage tickets page. The manage tickets button brings you to the page where you can see the tickets you have bought or used. tickets that havent been used which are "valid" can be used which then are displayed in the used tickets which you can see when clicking "used tickets" in the combobox. it will tell you when your ticket expires
+
+Finally you can access the top up page where you can top up your money using the buttons provided or enter a custom amount. This is used to buy your tickets.
+
+When logging in as a admin you are presented with a menu to change any ticket of your choice using the combo box and the entry box to set any new amount.
+
 **Use Case 1**
 The application presents the user with the home page welcoming and introducing them to the application allowing them to access the login page or register page. This allows them to either login or register as a passenger or login as an administrator.
 
@@ -31,3 +40,6 @@ Had issues with scrollable frame for one of my classes so i decided to revert ba
 
 **Use Case 3**
 Administrators will be able to control ticket pricing by changing individual pricing for different tickets
+
+**Summary Of Use Case 3**
+No new classes made since adminView was already a class. Created New methods to construct the adminView. Removed alot of repition from code by using methods to eliminate repeating code. Testing have been done and whilst there was some syntax errors, they have been fixed and the application is fully functional
