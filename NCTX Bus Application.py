@@ -6,6 +6,30 @@ dbPath=os.path.join(baseDir,"NCTX Database.db")
 database=sqlite3.connect(dbPath)
 cursor=database.cursor()
 
+class topUpMoneyView(ctk.CTkFrame):
+    def __init__(self,parent,root):
+        super().__init__(parent)
+        self.root=root
+        self.grid_columnconfigure(0, weight=1)
+    def getTopUpValue(self):
+        cursor.execute("SELECT MoneyInPennies FROM Users WHERE Username=?",(self.root.loginUsername,))
+        currentMoney=cursor.fetchone()
+        ctk.CTkLabel(self,text=f"Current Money: £{currentMoney/100}",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15)).grid(row=1, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.topUp5Button=ctk.CTkButton(self,text="Top Up £5",command=lambda:self.topUp(5))
+        self.topUp5Button.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.topUp10Button=ctk.CTkButton(self,text="Top Up £10",command=lambda:self.topUp(10))
+        self.topUp10Button.grid(row=2, column=1, padx=20, pady=(0, 20), sticky="n")
+        self.topUp15Button=ctk.CTkButton(self,text="Top Up £15",command=lambda:self.topUp(15))
+        self.topUp15Button.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.topUp20Button=ctk.CTkButton(self,text="Top Up £15",command=lambda:self.topUp(20))
+        self.topUp20Button.grid(row=3, column=1, padx=20, pady=(0, 20), sticky="n")
+    def topUp(self,amountInPounds):
+            amountInPennies=amountInPounds*100
+            cursor.execute("UPDATE Users SET MoneyInPennies=MoneyInPennies+? WHERE Username=?",(amountInPennies,self.root.loginUsername,))
+            database.commit
+            for widget in self.winfo_children():
+                widget.destroy()
+            self.getTopUpValue()
 class csvFile():
     def __init__(self):
         super().__init__()
@@ -78,6 +102,10 @@ class userView(ctk.CTkFrame):
         self.welcomeUserText.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.viewAndBuyTicketsButton=ctk.CTkButton(self,text="View And Buy Tickets",command=self.root.buyAndViewTicketsVisible)
         self.viewAndBuyTicketsButton.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.manageTicketsButton=ctk.CTkButton(self,text="Manage Your Tickets")
+        self.manageTicketsButton.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.topupButton=ctk.CTkButton(self,text="Top Up Money",command=self.root.topUpMoneyVisible)
+        self.topupButton.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
 
 class loginView(ctk.CTkFrame):
     def __init__(self,parent,root):
@@ -100,6 +128,7 @@ class loginView(ctk.CTkFrame):
     def usernameAndPasswordGetter(self):
         loginUsername=self.loginUsernameBox.get()
         loginPassword=self.loginPasswordBox.get()
+        self.root.loginUsername=loginUsername
         cursor.execute("SELECT Username,Password FROM Users WHERE Username=? AND Password=?",(loginUsername,loginPassword))
         result=cursor.fetchone()
         if result:
@@ -134,7 +163,7 @@ class registerView(ctk.CTkFrame):
         registeredPassword=self.registerPasswordBox.get()
         if registeredUsername and registeredPassword:
             try:
-                cursor.execute("INSERT INTO Users (Username,Password) VALUES (?,?)",(registeredUsername,registeredPassword))
+                cursor.execute("INSERT INTO Users (Username,Password,MoneyInPennies) VALUES (?,?,?)",(registeredUsername,registeredPassword,0))
                 database.commit()
                 dialogBox(self,"Success!","Your Username and password have been successfully registered")
                 self.root.homeViewVisible()
@@ -175,12 +204,14 @@ class homeView(ctk.CTk):
         self.user_View=userView(self.frame,self)
         self.admin_View=adminView(self.frame)
         self.viewAndBuyTickets_View=viewAndBuyTicketsView(self.frame)
+        self.topUpMoney_View=topUpMoneyView(self.frame,self)
         self.login_View.grid(row=0, column=0, sticky="nsew")
         self.register_View.grid(row=0, column=0, sticky="nsew")
         self.home_View.grid(row=0, column=0, sticky="nsew")
         self.user_View.grid(row=0, column=0, sticky="nsew")
         self.admin_View.grid(row=0, column=0, sticky="nsew")
         self.viewAndBuyTickets_View.grid(row=0,column=0,sticky="nsew")
+        self.topUpMoney_View.grid(row=0,column=0,sticky="nsew")
         self.homeText1=ctk.CTkLabel(self.home_View,text="Welcome to the NCTX Bus Application",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",18))
         self.homeText1.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.homeText2=ctk.CTkLabel(self.home_View,text="Please either Login or Register as a user",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15))
@@ -209,6 +240,9 @@ class homeView(ctk.CTk):
     def buyAndViewTicketsVisible(self):
         self.geometry("1250x700")
         self.viewAndBuyTickets_View.tkraise()
+    def topUpMoneyVisible(self):
+        self.topUpMoney_View.getTopUpValue()
+        self.topUpMoney_View.tkraise()
 
 window1 = homeView()
 window1.mainloop()
