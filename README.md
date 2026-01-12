@@ -21,3 +21,10 @@ When a new window gets opened a additional root tk window gets opened too, the i
 
 ##Use Case 2
 Once the user logs in, the program presents the user with the main screen where there is a button which lets the user buy or view tickets in a different view. The program will also let them view the tickets they have bought and lets them activate the ticket. Another button lets them top up money to buy the tickets. User purchases will be tracked using an sql database and ticket pricing will be changed using the mobile product.csv that NCTX has provided. The duration of the ticket sale will be tracking using the same SQL database but in another table.
+
+#Summary of Use Case 2
+I created 3 buttons in the user view frame which navigates them to either the page where they buy tickets, manage their tickets or top up their money. i added database functionality so all the data can be stored and retrieved easily. for the buy or view tickets view i added a combo box for the user to change what ticket type they want to view(single, 1 day, 1 week, 1 month or annual ticket). This view lets them buy tickets and the ticket information is stored in the database in a purchases table. For the manage tickets view the tickets are retrieved from the database and shown to the user and they can see their activated tickets and tickets that are valid and ready to be used. Final view is top up view where the user can top up their amount.
+<ins>Implemented:</ins>
+new classes(viewAndBuyTicketsView,csvFile,topUpMoneyView,manageTicketsView)
+<ins>Issues during testing and fixes:</ins>
+Had issues with scrollable frame for one of my classes so i decided to revert back to ctkframes. after using scrollable frames later inside a view, it decided to work. Not sure what the issue was for it not to work the first time but i have figured out a way to get around the issue. when retrieving moneyInPennies from the database it was as a tuple meaning i couldnt show the amount a user has. the solution was to add a [0] after fetching the moneyInPennies which has since been renamed to amountInPennies for clarity.
