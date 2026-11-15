@@ -1,29 +1,12 @@
+import sqlite3,os.path
 import customtkinter as ctk # type: ignore
-import sqlite3,os.path,csv
 from datetime import datetime,timedelta
-
+import CSVParser
 
 baseDir=os.path.dirname(os.path.abspath(__file__)) #gets the directionary of the python file
 dbPath=os.path.join(baseDir,"NCTX Database.db") #uses the directionary of the python file to find the dataabase file
 database=sqlite3.connect(dbPath) #python file connects to the database
 cursor=database.cursor() #executes commands(the link from the database to the python file)
-CSVName="mobile_products.csv" #CSV file name
-
-def loadCSVRows():  #method that loads the ticket data from the CSV File into python
-    csvPath=os.path.join(baseDir,CSVName) #gets the file path for the CSV File
-    with open(csvPath,newline="") as f: #opens the CSV file and newline="" prevents any blank lines from appearing
-        reader=csv.DictReader(f)#reads every CSV row as a dictionary
-        rows=list(reader) #converts all CSV rows into a list
-        fieldnames=reader.fieldnames #Stores CSV column headers
-    return rows,fieldnames
-def saveCSVRows(rows,fieldnames): #overwrites the CSV file with new values
-    csvPath=os.path.join(baseDir,CSVName)
-    with open(csvPath,"w",newline="") as f:
-        writer=csv.DictWriter(f,fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-
-
 
 class adminView(ctk.CTkFrame): #this is the page the admin sees when logging in
     def __init__(self,parent,root):
@@ -32,7 +15,7 @@ class adminView(ctk.CTkFrame): #this is the page the admin sees when logging in
         self.grid_columnconfigure(0, weight=1) #these two configure columns so widgets expand evenly
         self.grid_columnconfigure(1, weight=1)
         try:    #tries loading the csv file containing the ticket data
-            self.rows,self.fieldnames=loadCSVRows()
+            self.rows,self.fieldnames=CSVParser.loadCSVRows()
         except FileNotFoundError:   #if the csv file is missing it will alert the user
             dialogBox(self.root,"CSV Error","mobile_products.csv file not found, please ensure it is stored in the same folder as the python file")
             self.rows=[]
@@ -83,18 +66,20 @@ class adminView(ctk.CTkFrame): #this is the page the admin sees when logging in
     def saveNewPrice(self):#user must select a ticket before saving price
         if self.selectedRowIndex is None:
             dialogBox(self,"Select Ticket","Please select a ticket first.")
+            return
         newPriceInPounds=self.newPrice.get().strip().replace("£","")#removes pound symbol if typed
         try:
             newPriceInPoundsFloat=float(newPriceInPounds)
         except:
             dialogBox(self,"Invalid Price", "Enter A Valid Number")#prevents any other input
+            return
         if newPriceInPoundsFloat < 0:
             dialogBox(self, "Invalid Price", "Price cannot be negative.")#prevents negative numbers
             return
         newPriceInPence=int(round(newPriceInPoundsFloat*100))#converts pounds into pence
         try:
             self.rows[self.selectedRowIndex]["topup_price_in_pence"]=str(newPriceInPence)#updates the csv price to have the new price
-            saveCSVRows(self.rows,self.fieldnames)#saves the file
+            CSVParser.saveCSVRows(self.rows,self.fieldnames)#saves the file
         except Exception:
             dialogBox(self,"Save Error","Could not write the updated price to the CSV.")
             return
@@ -221,45 +206,17 @@ class topUpMoneyView(ctk.CTkFrame):
                 if widget is not self.backButton:
                     widget.destroy()
             self.getTopUpValue()
-class csvFile():
-    def __init__(self):
-        super().__init__()
-    def readCSVTicketInfo(self,durationValue):
-        TicketsDict=[]
-        csvPath=os.path.join(baseDir,"mobile_products.csv")
-        try:
-            with open(csvPath) as csvfile:
-                csvReader=csv.DictReader(csvfile)
-                for row in csvReader:
-                    if row["topup_entitlement_value"]==durationValue:
-                            price_in_pounds=int(row['topup_price_in_pence'])/100
-                            TicketsDict.append({"title":row['topup_title'],"description":row['category_description'],"price":price_in_pounds,"duration": int(row["topup_entitlement_value"]),"people": int(row["topup_passenger_class_quantity"])})
-        except FileNotFoundError:
-            dialogBox(self.root,"CSV Error","mobile_products.csv file not found, please ensure it is stored in the same folder as the python file")
-            return []
-        except Exception:
-            dialogBox(self.root,"CSV Error","The CSV file could not be read")
-            return []
-        return TicketsDict
-    def readCSVForSingleTickets(self):
-        return self.readCSVTicketInfo("10")
-    def readCSVForDayTickets(self):
-        return self.readCSVTicketInfo("1")
-    def readCSVForWeekTickets(self):
-        return self.readCSVTicketInfo("7")
-    def readCSVForMonthTickets(self):
-        return self.readCSVTicketInfo("31")
-    def readCSVForYearTickets(self):
-        return self.readCSVTicketInfo("365")
+
+
 
 class viewAndBuyTicketsView(ctk.CTkFrame):
     def __init__(self,parent,root):
         super().__init__(parent)
         self.root=root
-        self.data=self.csv_Reader=csvFile()
+        self.data=self.csv_Reader=CSVParser.csvFile()
         self.grid_columnconfigure((0,1), weight=1)
         self.grid_rowconfigure(1,weight=1)#dropdown to select ticket category
-        self.ticketCategorySelection=ctk.CTkComboBox(self,values=["Choose Category","Single Use Tickets","24 Hour Tickets","7 Day Tickets","31 Day Tickets","Annual Tickets"],command=self.changeWidgets)
+        self.ticketCategorySelection=ctk.CTkComboBox(self,values=["Choose Category","Single Use Tickets","24 Hour Tickets","7 Day Tickets","31 Day Tickets","Annual Tickets"],command=self.changeWidgets,width=200)
         self.ticketCategorySelection.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.backButton=ctk.CTkButton(self,text="Back",command=self.root.userViewVisible)
         self.backButton.grid(row=0, column=1, padx=20, pady=(0, 20), sticky="n")
@@ -362,6 +319,7 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
             self.page-=1
             self.viewTickets(self.data, showPaging=True)
 
+
 class userView(ctk.CTkFrame):
     def __init__(self,parent,root):
         super().__init__(parent)
@@ -391,10 +349,14 @@ class loginView(ctk.CTkFrame):
         self.loginUsernameBox.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="n")
         self.loginText3=ctk.CTkLabel(self,text="Password:",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15))
         self.loginText3.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.loginPasswordBox=ctk.CTkEntry(self,placeholder_text="Password")
+        self.loginPasswordBox=ctk.CTkEntry(self,placeholder_text="Password",show="*")
         self.loginPasswordBox.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.loginButton=ctk.CTkButton(self,text="Login",command=self.usernameAndPasswordGetter)
+        self.buttonFrame = ctk.CTkFrame(self, fg_color="transparent")#to avoid the buttons extending the current frame
+        self.buttonFrame.grid(row=5, column=0, pady=(0, 20))
+        self.loginButton=ctk.CTkButton(self.buttonFrame,text="Login",command=self.usernameAndPasswordGetter)
         self.loginButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.backButton=ctk.CTkButton(self.buttonFrame,text="Back",command=self.root.homeViewVisible)
+        self.backButton.grid(row=5, column=1, padx=20, pady=(0, 20), sticky="n")
         
     def usernameAndPasswordGetter(self):
         loginUsername=self.loginUsernameBox.get()
@@ -424,11 +386,14 @@ class registerView(ctk.CTkFrame):
         self.registerUsernameBox.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="n")
         self.registerText3=ctk.CTkLabel(self,text="Password:",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15))
         self.registerText3.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.registerPasswordBox=ctk.CTkEntry(self,placeholder_text="Password")
+        self.registerPasswordBox=ctk.CTkEntry(self,placeholder_text="Password",show="*")
         self.registerPasswordBox.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.registerButton=ctk.CTkButton(self,text="Register",command=self.usernameAndPasswordSetter)
+        self.buttonFrame = ctk.CTkFrame(self, fg_color="transparent")#to avoid the buttons extending the current frame
+        self.buttonFrame.grid(row=5, column=0, pady=(0, 20))
+        self.registerButton=ctk.CTkButton(self.buttonFrame,text="Register",command=self.usernameAndPasswordSetter)
         self.registerButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
-
+        self.backButton=ctk.CTkButton(self.buttonFrame,text="Back",command=self.root.homeViewVisible)
+        self.backButton.grid(row=5, column=1, padx=20, pady=(0, 20), sticky="n")
     def usernameAndPasswordSetter(self):
         registeredUsername=self.registerUsernameBox.get()#gets the username and password from the entry boxes
         registeredPassword=self.registerPasswordBox.get()
@@ -461,7 +426,6 @@ class homeView(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("NCTX Bus Application")
-        self.geometry("400x325")#size of window
         self.grid_rowconfigure(0,weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.frame=ctk.CTkFrame(self)
@@ -477,14 +441,7 @@ class homeView(ctk.CTk):
         self.viewAndBuyTickets_View=viewAndBuyTicketsView(self.frame,self)
         self.topUpMoney_View=topUpMoneyView(self.frame,self)
         self.manageTickets_View=manageTicketsView(self.frame,self)
-        self.login_View.grid(row=0, column=0, sticky="nsew")
-        self.register_View.grid(row=0, column=0, sticky="nsew")
-        self.home_View.grid(row=0, column=0, sticky="nsew")
-        self.user_View.grid(row=0, column=0, sticky="nsew")
-        self.admin_View.grid(row=0, column=0, sticky="nsew")
-        self.viewAndBuyTickets_View.grid(row=0,column=0,sticky="nsew")
-        self.topUpMoney_View.grid(row=0,column=0,sticky="nsew")
-        self.manageTickets_View.grid(row=0,column=0,sticky="nsew")
+        self.all_views = [self.login_View,self.register_View,self.home_View,self.user_View,self.admin_View,self.viewAndBuyTickets_View,self.topUpMoney_View,self.manageTickets_View]
         self.homeText1=ctk.CTkLabel(self.home_View,text="Welcome to the NCTX Bus Application",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",18))
         self.homeText1.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.homeText2=ctk.CTkLabel(self.home_View,text="Please either Login or Register as a user",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15))
@@ -494,35 +451,56 @@ class homeView(ctk.CTk):
         self.registerViewButton=ctk.CTkButton(self.home_View,text="Register",command=self.registerViewVisible)
         self.registerViewButton.grid(row=7, column=0, padx=20, pady=(0, 20), sticky="n")
         self.homeViewVisible()
+    def centreWindow(self):
+        self.update_idletasks()
 
-    def homeViewVisible(self):#all the methods to display their frame on top
-        self.home_View.tkraise()
+        windowWidth = self.winfo_width()
+        windowHeight = self.winfo_height()
+
+        screenWidth = self.winfo_screenwidth()
+        screenHeight = self.winfo_screenheight()
+
+        x = (screenWidth - windowWidth) // 2
+        y = int((screenHeight - windowHeight) // 2.5)
+
+        self.geometry(f"+{x}+{y}")
+
+    def showFrame(self, frame, customSize=""):
+        # Hide all existing frames
+        for view in self.all_views:
+            view.grid_remove()
+
+        # Display the selected frame
+        frame.grid(row=0, column=0, sticky="nsew")
+
+        # Set window size or reset to automatic sizing
+        if customSize:
+            self.geometry(customSize)
+        else:
+            self.wm_geometry("")
+        self.centreWindow()
+
+    def homeViewVisible(self):
+        self.showFrame(self.home_View,"400x325")
 
     def loginViewVisible(self):
-        self.login_View.tkraise()
+        self.showFrame(self.login_View)
 
     def registerViewVisible(self):
-        self.register_View.tkraise()
+        self.showFrame(self.register_View, "450x350")
 
     def userViewVisible(self):
-        self.user_View.tkraise()
+        self.showFrame(self.user_View,"400x325")
 
     def adminViewVisible(self):
-        self.admin_View.tkraise()
+        self.showFrame(self.admin_View)
 
     def buyAndViewTicketsVisible(self):
-        self.geometry("1250x700")
-        self.viewAndBuyTickets_View.tkraise()
+        self.showFrame(self.viewAndBuyTickets_View, "1250x700")
+
     def topUpMoneyVisible(self):
         self.topUpMoney_View.getTopUpValue()
-        self.topUpMoney_View.tkraise()
-    
+        self.showFrame(self.topUpMoney_View)
+
     def manageTicketVisible(self):
-        self.geometry("600x325")
-        self.manageTickets_View.tkraise()
-
-window1 = homeView()
-window1.mainloop()
-
-
-        
+        self.showFrame(self.manageTickets_View, "600x325")
