@@ -2,6 +2,7 @@ import sqlite3,os.path
 import customtkinter as ctk # type: ignore
 from datetime import datetime,timedelta
 import CSVParser
+import passwordManager
 
 baseDir=os.path.dirname(os.path.abspath(__file__)) #gets the directionary of the python file
 dbPath=os.path.join(baseDir,"NCTX Database.db") #uses the directionary of the python file to find the dataabase file
@@ -362,9 +363,9 @@ class loginView(ctk.CTkFrame):
         loginUsername=self.loginUsernameBox.get()
         loginPassword=self.loginPasswordBox.get()
         self.root.loginUsername=loginUsername
-        cursor.execute("SELECT Username,Password FROM Users WHERE Username=? AND Password=?",(loginUsername,loginPassword))#gets the username and password and compares it in the database for a matching record
+        cursor.execute("SELECT Username,Password FROM Users WHERE Username=?",(loginUsername,))#gets the username and password and compares it in the database for a matching record
         result=cursor.fetchone()
-        if result:
+        if result and passwordManager.verifyPassword(result[1], loginPassword):
             if loginUsername=="admin" and loginPassword=="admin":#if admin then they will get a special window
                 self.root.adminViewVisible()
             else:
@@ -388,18 +389,25 @@ class registerView(ctk.CTkFrame):
         self.registerText3.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
         self.registerPasswordBox=ctk.CTkEntry(self,placeholder_text="Password",show="*")
         self.registerPasswordBox.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.registerText4=ctk.CTkLabel(self,text="Password must contain: \n8 characters\n1 special character\n 1 uppercase and lowercase letter",fg_color="transparent",text_color="Black",anchor="center",font=("Arial",15))
+        self.registerText4.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
         self.buttonFrame = ctk.CTkFrame(self, fg_color="transparent")#to avoid the buttons extending the current frame
-        self.buttonFrame.grid(row=5, column=0, pady=(0, 20))
+        self.buttonFrame.grid(row=6, column=0, pady=(0, 20))
         self.registerButton=ctk.CTkButton(self.buttonFrame,text="Register",command=self.usernameAndPasswordSetter)
-        self.registerButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.registerButton.grid(row=6, column=0, padx=20, pady=(0, 20), sticky="n")
         self.backButton=ctk.CTkButton(self.buttonFrame,text="Back",command=self.root.homeViewVisible)
-        self.backButton.grid(row=5, column=1, padx=20, pady=(0, 20), sticky="n")
+        self.backButton.grid(row=6, column=1, padx=20, pady=(0, 20), sticky="n")
     def usernameAndPasswordSetter(self):
         registeredUsername=self.registerUsernameBox.get()#gets the username and password from the entry boxes
         registeredPassword=self.registerPasswordBox.get()
         if registeredUsername and registeredPassword:
+            passwordError = passwordManager.validatePassword(registeredPassword)
+            if passwordError:
+                dialogBox(self,"Weak Password",passwordError)
+                return
             try:
-                cursor.execute("INSERT INTO Users (Username,Password,BalanceInPennies) VALUES (?,?,?)",(registeredUsername,registeredPassword,0))# inserts the registered username and password into the database
+                hashedPassword = passwordManager.hashPassword(registeredPassword)
+                cursor.execute("INSERT INTO Users (Username,Password,BalanceInPennies) VALUES (?,?,?)",(registeredUsername,hashedPassword,0))# inserts the registered username and password into the database
                 database.commit()
                 dialogBox(self,"Success!","Your Username and password have been successfully registered")
                 self.root.homeViewVisible()
@@ -422,7 +430,27 @@ class dialogBox(ctk.CTkToplevel):
         self.attributes('-topmost', True) #is on top and other program window cant be used until the dialog box is closed
         self.grab_set()
 
-class homeView(ctk.CTk):
+class homeView(ctk.CTkFrame):
+    def __init__(self, parent, root):
+        super().__init__(parent)
+        self.root = root
+        self.grid_columnconfigure(0, weight=1)
+
+        
+
+        self.all_views = [self.login_View,self.register_View,self.home_View,self.user_View,self.admin_View,self.viewAndBuyTickets_View,self.topUpMoney_View,self.manageTickets_View]
+        self.homeText1=ctk.CTkLabel(self,text="Welcome to the NCTX Bus Application",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",18))
+        self.homeText1.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.homeText2=ctk.CTkLabel(self,text="Please either Login or Register as a user",fg_color="transparent",text_color="Black",anchor="center",font=("Arial",15))
+        self.homeText2.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.loginViewButton=ctk.CTkButton(self,text="Login",command=self.root.loginViewVisible)
+        self.loginViewButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.registerViewButton=ctk.CTkButton(self,text="Register",command=self.registerViewVisible)
+        self.registerViewButton.grid(row=7, column=0, padx=20, pady=(0, 20), sticky="n")
+        self.homeViewVisible()
+
+
+class mainApplication(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("NCTX Bus Application")
@@ -435,22 +463,12 @@ class homeView(ctk.CTk):
 
         self.login_View=loginView(self.frame,self) #every line creates one page and attaches it to the controller(self)
         self.register_View=registerView(self.frame,self)
-        self.home_View=ctk.CTkFrame(self.frame)
+        self.home_View=homeView(self.frame,self)
         self.user_View=userView(self.frame,self)
         self.admin_View=adminView(self.frame,self)
         self.viewAndBuyTickets_View=viewAndBuyTicketsView(self.frame,self)
         self.topUpMoney_View=topUpMoneyView(self.frame,self)
         self.manageTickets_View=manageTicketsView(self.frame,self)
-        self.all_views = [self.login_View,self.register_View,self.home_View,self.user_View,self.admin_View,self.viewAndBuyTickets_View,self.topUpMoney_View,self.manageTickets_View]
-        self.homeText1=ctk.CTkLabel(self.home_View,text="Welcome to the NCTX Bus Application",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",18))
-        self.homeText1.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.homeText2=ctk.CTkLabel(self.home_View,text="Please either Login or Register as a user",fg_color="transparent",text_color="Black",anchor="center",font=("MS Sans Serif",15))
-        self.homeText2.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.loginViewButton=ctk.CTkButton(self.home_View,text="Login",command=self.loginViewVisible)
-        self.loginViewButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.registerViewButton=ctk.CTkButton(self.home_View,text="Register",command=self.registerViewVisible)
-        self.registerViewButton.grid(row=7, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.homeViewVisible()
     def centreWindow(self):
         self.update_idletasks()
 
@@ -481,13 +499,13 @@ class homeView(ctk.CTk):
         self.centreWindow()
 
     def homeViewVisible(self):
-        self.showFrame(self.home_View,"400x325")
+        self.showFrame(self.home_View,"400x250")
 
     def loginViewVisible(self):
         self.showFrame(self.login_View)
 
     def registerViewVisible(self):
-        self.showFrame(self.register_View, "450x350")
+        self.showFrame(self.register_View, "450x400")
 
     def userViewVisible(self):
         self.showFrame(self.user_View,"400x325")
