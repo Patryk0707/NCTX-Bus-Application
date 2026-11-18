@@ -3,11 +3,27 @@ import customtkinter as ctk # type: ignore
 from datetime import datetime,timedelta
 import CSVParser
 import passwordManager
+from CTkScrollableDropdown import CTkScrollableDropdown
+import re
 
 baseDir=os.path.dirname(os.path.abspath(__file__)) #gets the directionary of the python file
 dbPath=os.path.join(baseDir,"NCTX Database.db") #uses the directionary of the python file to find the dataabase file
 database=sqlite3.connect(dbPath) #python file connects to the database
 cursor=database.cursor() #executes commands(the link from the database to the python file)
+hashedPassword = passwordManager.hashPassword("admin")
+
+
+
+database.commit()
+def getTicketUses(title):
+
+    match = re.search(r"\bx\s*(\d+)\b|\b(\d+)\s+trips?\b", title, re.IGNORECASE)
+
+    if match:
+        return int(match.group(1) or match.group(2))
+
+    return 1
+
 
 class adminView(ctk.CTkFrame): #this is the page the admin sees when logging in
     def __init__(self,parent,root):
@@ -34,9 +50,10 @@ class adminView(ctk.CTkFrame): #this is the page the admin sees when logging in
                 option=f"{option}" #if duplicate titles exist it wont overwite the dictonary keys
             self.ticketOptions.append(option)
             self.indexByOption[option]=i    #stores the index
-        self.ticketSelect=ctk.CTkComboBox(self,values=(["Select Ticket"]+self.ticketOptions),command=self.ticketChange,width=420)#dropdown to select what ticket to change price of
-        self.ticketSelect.set("Select Ticket")#view automatically goes to select ticket when the frame is opened
-        self.ticketSelect.grid(row=1, column=0, columnspan=2, padx=20, pady=(10, 10), sticky="ew")
+        self.ticketSelect = ctk.CTkComboBox(self,width=420,state="readonly")
+        self.ticketSelect.set("Select Ticket")
+        self.ticketSelect.grid(row=1, column=0, columnspan=2,padx=20, pady=10, sticky="ew")
+        self.ticketDropdown = CTkScrollableDropdown(self.ticketSelect,values=["Select Ticket"] + self.ticketOptions,height=250,resize=False,scrollbar=True,justify="left",command=self.ticketChange)
         self.currentPriceText=ctk.CTkLabel(self,text="Current Price: -")#shows current price of ticket
         self.currentPriceText.grid(row=2, column=0, padx=20, pady=(10, 5), sticky="w")
         self.newPrice=ctk.CTkEntry(self,placeholder_text="Set New price in £")#shows new price of ticket
@@ -105,21 +122,29 @@ class manageTicketsView(ctk.CTkFrame):
     def usedTickets(self,purchaseID:int):
         usedTicketDate=datetime.now()
         usedTicketDateString=usedTicketDate.strftime("%d/%m/%y %H:%M")
-        cursor.execute("SELECT Duration From Purchases WHERE PurchaseID=? AND Username=? AND UsedDate Is NULL",(purchaseID,self.root.loginUsername))#checks if ticket is unused and belongs to the user which is logged in
+        cursor.execute("SELECT Duration,TotalUses,RemainingUses FROM Purchases WHERE PurchaseID=? AND Username=? AND RemainingUses>0",(purchaseID,self.root.loginUsername))#checks if ticket is unused and belongs to the user which is logged in
         row=cursor.fetchone()
         if not row:
             dialogBox(self,"Error","Ticket Already Used")
             return
         duration=int(row[0])
+        totalUses = row[1]
+        remainingUses = row[2]
+        useNumber = totalUses - remainingUses + 1
         if duration==10:
             ticketExpiryDate=usedTicketDate+timedelta(minutes=duration)#instead of days it uses minutes since its a single ticket
         else:
             ticketExpiryDate=usedTicketDate+timedelta(days=duration)#gets the expiry date by adding the days to the current date and then converting into string
         ticketExpiryDateString=ticketExpiryDate.strftime("%d/%m/%y %H:%M")
-        cursor.execute("UPDATE Purchases SET UsedDate=?,ExpiryDate=? WHERE PurchaseID=? AND Username=? AND UsedDate IS NULL",(usedTicketDateString,ticketExpiryDateString,purchaseID,self.root.loginUsername))#updates ticket in database
+        with database:
+            cursor.execute("UPDATE Purchases SET RemainingUses=RemainingUses-1 WHERE PurchaseID=? AND Username=? AND RemainingUses>0",(purchaseID,self.root.loginUsername))
+            if cursor.rowcount == 0:
+                dialogBox(self,"Error","No uses remaining")
+                return
+            cursor.execute("INSERT INTO TicketUses(PurchaseID,UseNumber,UsedDate,ExpiryDate) VALUES(?,?,?,?)",(purchaseID,useNumber,usedTicketDateString,ticketExpiryDateString))
         database.commit()
-        dialogBox(self,"Success","Ticket activated!")
-        self.refreshLists()
+        dialogBox(self,"Success",f"Ticket activated! Uses remaining: {remainingUses-1}")
+        self.self.after(200, self.refreshLists)()
 
     def refreshLists(self,choice=None):
         if choice is None:
@@ -128,7 +153,7 @@ class manageTicketsView(ctk.CTkFrame):
             w.destroy()
         username=self.root.loginUsername
         if choice=="Valid Tickets":
-            cursor.execute("SELECT PurchaseID,TicketTitle,Duration,DatePurchased FROM Purchases WHERE Username=? AND UsedDate Is NULL ORDER BY PurchaseID DESC",(username,)) #fetches all valid tickets
+            cursor.execute("SELECT PurchaseID,TicketTitle,Duration,DatePurchased,TotalUses,RemainingUses FROM Purchases WHERE Username=? AND RemainingUses>0 ORDER BY PurchaseID DESC",(username,))
             rows=cursor.fetchall()
             if not rows:
                 ctk.CTkLabel(self.displayTicketsFrame,text="No valid tickets").grid(row=0, column=0, pady=10)
@@ -139,13 +164,18 @@ class manageTicketsView(ctk.CTkFrame):
                 title=row[1]
                 duration=row[2]
                 datePurchased=row[3]
+                totalUses = row[4]
+                remainingUses = row[5]
+                usedCount = totalUses - remainingUses
                 ctk.CTkLabel(self.displayTicketsFrame,text=title,font=("MS Sans Serif",16)).grid(row=r,column=0,sticky="w",pady=(10,0))
                 ctk.CTkLabel(self.displayTicketsFrame,text=f"Purchased: {datePurchased}  Duration: {self.durationFormat(int(duration))}").grid(row=r+1, column=0, sticky="w")
+                ctk.CTkLabel(self.displayTicketsFrame,text=f"Uses: {remainingUses}/{totalUses} | Used: {usedCount}").grid(row=r+2,column=0,sticky="w")
                 useButton=ctk.CTkButton(self.displayTicketsFrame,text="Use",command=lambda p=purchaseID:self.usedTickets(p))
                 useButton.grid(row=r, column=1, rowspan=2, padx=10, pady=10)
-                r+=3
-        else:
-            cursor.execute("SELECT PurchaseID,TicketTitle,UsedDate,ExpiryDate FROM Purchases WHERE Username=? AND UsedDate IS NOT NULL ORDER BY PurchaseID DESC",(username,))
+                r+=4
+        elif choice=="Used Tickets":
+            cursor.execute("""SELECT Purchases.PurchaseID, Purchases.TicketTitle,TicketUses.UsedDate, TicketUses.ExpiryDate,TicketUses.UseNumber, Purchases.TotalUses 
+            FROM TicketUses JOIN Purchases ON TicketUses.PurchaseID=Purchases.PurchaseID WHERE Purchases.Username=? ORDER BY TicketUses.UseID DESC """,(username,))
             rows=cursor.fetchall()
             if not rows:
                 ctk.CTkLabel(self.displayTicketsFrame,text="No used tickets").grid(row=0,column=0,pady=10)
@@ -156,7 +186,9 @@ class manageTicketsView(ctk.CTkFrame):
                 title = row[1]
                 usedDate = row[2]
                 expiryDate = row[3]
-                ctk.CTkLabel(self.displayTicketsFrame,text=title,font=("MS Sans Serif", 16)).grid(row=r,column=0,sticky="w",pady=(10,0))
+                useNumber = row[4]
+                totalUses = row[5]
+                ctk.CTkLabel(self.displayTicketsFrame,text=f"{title} - Use {useNumber}/{totalUses}",font=("MS Sans Serif",16)).grid(row=r,column=0,sticky="w",pady=(10,0))
                 ctk.CTkLabel(self.displayTicketsFrame,text=f"Used: {usedDate} | Expires: {expiryDate}").grid(row=r+1,column=0,sticky="w")
                 r += 3
     def durationFormat(self,duration):# if duration is 10 then its displayed as minutes if 1 then day and else its days
@@ -261,7 +293,8 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
         title=ticket["title"]
         purchasedDate=datetime.now().strftime("%d/%m/%y %H:%M")
         duration=int(ticket.get("duration",0)) #duration set to 0 if missing
-        cursor.execute("INSERT INTO Purchases(Username,TicketTitle,Duration,PricePaidInPennies,DatePurchased,UsedDate,ExpiryDate)VALUES(?,?,?,?,?,NULL,NULL)",(username,title,duration,pricePaidInPennies,purchasedDate))
+        totalUses = getTicketUses(title)
+        cursor.execute("INSERT INTO Purchases(Username,TicketTitle,Duration,PricePaidInPennies,DatePurchased,TotalUses,RemainingUses) VALUES(?,?,?,?,?,?,?)",(username,title,duration,pricePaidInPennies,purchasedDate,totalUses,totalUses))
         database.commit()
 
     def viewTickets(self,tickets,showPaging=False):
@@ -288,9 +321,10 @@ class viewAndBuyTicketsView(ctk.CTkFrame):
                     row=(i-10)*4
                 title=t.get("title","unknown")
                 people=t.get("people",1)
+                personText = "person" if int(people) == 1 else "people"
                 desc=t.get("description","")
                 price=t.get("price",0)
-                ctk.CTkLabel(self.widgets,text=f"{title}-Valid for:{people} people").grid(row=row,column=textCol,sticky="w",pady=(5,0))
+                ctk.CTkLabel(self.widgets,text=f"{title}-Valid for: {people} {personText}").grid(row=row,column=textCol,sticky="w",pady=(5,0))
                 ctk.CTkLabel(self.widgets,text=desc,wraplength=300).grid(row=row+1,column=textCol,sticky="w",pady=(5,0))
                 ctk.CTkLabel(self.widgets,text=f"Price: £{price}").grid(row=row+2,column=textCol,sticky="w",pady=(5,0))
                 ctk.CTkButton(self.widgets,width=60,text="Buy",command=lambda ticket=t:self.buyTickets(ticket)).grid(row=row+1,column=buttonCol,sticky="w",padx=(10,30),pady=(5,0))
@@ -363,10 +397,10 @@ class loginView(ctk.CTkFrame):
         loginUsername=self.loginUsernameBox.get()
         loginPassword=self.loginPasswordBox.get()
         self.root.loginUsername=loginUsername
-        cursor.execute("SELECT Username,Password FROM Users WHERE Username=?",(loginUsername,))#gets the username and password and compares it in the database for a matching record
+        cursor.execute("SELECT Username,Password,Role FROM Users WHERE Username=?", (loginUsername,))#gets the username and password and compares it in the database for a matching record
         result=cursor.fetchone()
         if result and passwordManager.verifyPassword(result[1], loginPassword):
-            if loginUsername=="admin" and loginPassword=="admin":#if admin then they will get a special window
+            if result[2] == "admin":#if admin then they will get a special window
                 self.root.adminViewVisible()
             else:
                 self.root.user_View.welcomeUserText.configure(text=f"Welcome {loginUsername}!")
@@ -436,18 +470,15 @@ class homeView(ctk.CTkFrame):
         self.root = root
         self.grid_columnconfigure(0, weight=1)
 
-        
-
-        self.all_views = [self.login_View,self.register_View,self.home_View,self.user_View,self.admin_View,self.viewAndBuyTickets_View,self.topUpMoney_View,self.manageTickets_View]
         self.homeText1=ctk.CTkLabel(self,text="Welcome to the NCTX Bus Application",fg_color="transparent",text_color="Black",anchor="center",font=("Arial Rounded MT Bold",18))
         self.homeText1.grid(row=0, column=0, padx=20, pady=(0, 20), sticky="n")
         self.homeText2=ctk.CTkLabel(self,text="Please either Login or Register as a user",fg_color="transparent",text_color="Black",anchor="center",font=("Arial",15))
         self.homeText2.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="n")
         self.loginViewButton=ctk.CTkButton(self,text="Login",command=self.root.loginViewVisible)
         self.loginViewButton.grid(row=5, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.registerViewButton=ctk.CTkButton(self,text="Register",command=self.registerViewVisible)
+        self.registerViewButton=ctk.CTkButton(self,text="Register",command=self.root.registerViewVisible)
         self.registerViewButton.grid(row=7, column=0, padx=20, pady=(0, 20), sticky="n")
-        self.homeViewVisible()
+
 
 
 class mainApplication(ctk.CTk):
@@ -469,6 +500,8 @@ class mainApplication(ctk.CTk):
         self.viewAndBuyTickets_View=viewAndBuyTicketsView(self.frame,self)
         self.topUpMoney_View=topUpMoneyView(self.frame,self)
         self.manageTickets_View=manageTicketsView(self.frame,self)
+        self.all_views = [self.login_View,self.register_View,self.home_View,self.user_View,self.admin_View,self.viewAndBuyTickets_View,self.topUpMoney_View,self.manageTickets_View]
+        self.homeViewVisible()
     def centreWindow(self):
         self.update_idletasks()
 
@@ -521,4 +554,6 @@ class mainApplication(ctk.CTk):
         self.showFrame(self.topUpMoney_View)
 
     def manageTicketVisible(self):
-        self.showFrame(self.manageTickets_View, "600x325")
+        self.manageTickets_View.chooseTickets.set("Valid Tickets")
+        self.manageTickets_View.refreshLists("Valid Tickets")
+        self.showFrame(self.manageTickets_View,"600x400")
